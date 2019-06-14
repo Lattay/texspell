@@ -9,6 +9,9 @@ class SpellError:
         self._alt_file = 'anonym'
         self.source_side = source_side
 
+    def __str__(self):
+        return '<SpellError: ' + self.message + '>'
+
     def toggle_pos_mode(self, pos_map):
         if self.source_side:
             self.start, self.end = \

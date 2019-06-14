@@ -1,18 +1,18 @@
 from warnings import warn
-from string import StringIO
-from subprocess import Popen
+from subprocess import Popen, PIPE
 import json
 import os
 
 from protex.text_pos import text_origin, TextPos
 
 from .error import SpellError
-from .tool import auto_start
+from .tools import auto_start
 
 
 class Backend:
-    def __init__(self, name):
+    def __init__(self, name, nvim):
         self.name = name
+        self.nvim = nvim
 
     def error(self, msg):
         return SpellError(text_origin, text_origin + 1, msg, short='config error')
@@ -30,12 +30,13 @@ def register_backend(name):
     def dec(cls):
         if name in _backend_map:
             warn('Existing {} backend have been overridden.')
-        _backend_map[name]
+        _backend_map[name] = cls
         return cls
     return dec
 
 
-def load_backend(name, nvim):
+def load_backend(nvim):
+    name = nvim.eval('g:texspell_engine')
     return _backend_map.get(name, NotABackend)(name, nvim)
 
 
@@ -46,12 +47,16 @@ class LanguageToolInterface:
         self.lang = lang
 
     def parse(self, content):
+        with open('/home/cavignac/json.log', 'w') as f:
+            print(content, file=f)
         return json.loads(content)
 
     def check(self, source):
-        with Popen(['java', '-jar', self.jar, '-l', self.lang],
-                   stdin=StringIO(source), capture_output=True) as p:
-            res = p.stdout.read()
+        p = Popen(['java', '-jar', self.jar, '-l', self.lang],
+                  stdin=PIPE, stdout=PIPE)
+        p.stdin.write(source.encode('utf8'))
+        p.wait()
+        res = p.stdout.read().decode('utf8')
         return self.parse(res)['matches']
 
 
@@ -60,8 +65,11 @@ class LanguageToolServer(LanguageToolInterface):
         super().__init__(path, lang)
         self.jar = os.path.join(self.path, 'languagetool-server.jar')
         self.port = 8888
-        self.cmd = 'java -cp {} org.languagetool.server.HTTPServer --port {} --allow-origin \'*\''
-        self.proc = Popen(['java', '-jar', path, '-l', lang])
+        self.cmd = ' '
+        self.proc = Popen([
+            'java', '-cp', self.jar, 'org.languagetool.server.HTTPServer',
+            '--port', self.port, '--allow-origin \'*\'', '-l', self.lang
+        ])
 
     def check(self, source):
         errors = []
@@ -86,19 +94,22 @@ def mkmkpos(source):
 @register_backend('languagetool')
 class LanguageTool(Backend):
     def start(self):
-        self.ltpath = self.nvim.eval('g:texspell_languagetool_path')
-        self.lang = self.nvim.eval('g:texspell_languagetool_lang')
-        self.server = LanguageToolInterface(self.ltpath, self.server)
+        self.ltpath = os.path.expanduser(self.nvim.eval('g:texspell_languagetool_path'))
+        self.lang = self.nvim.eval('g:texspell_lang')
+        self.server = LanguageToolInterface(self.ltpath, self.lang)
 
     @auto_start
     def check(self, source):
         mkpos = mkmkpos(source)
-        for err in self.server.check(source):
-            offset = err['offset']
-            length = err['context']['length']
-            start = mkpos(offset)
-            end = mkpos(offset + length)
-            yield SpellError(
-                start, end, err['message'], short=err['shortMessage'],
-                code=err['rule']['id']
-            )
+        try:
+            for err in self.server.check(source):
+                offset = err['offset']
+                length = err['context']['length']
+                start = mkpos(offset)
+                end = mkpos(offset + length)
+                yield SpellError(
+                    start, end, err['message'], short=err['shortMessage'],
+                    code=err['rule']['id']
+                )
+        except Exception as e:
+            yield self.error('Something wrong happened: {}'.format(e))
