@@ -6,11 +6,6 @@ from .tools import auto_start
 from .backend import load_backend
 
 
-def log(*args, **kwargs):
-    with open('/home/cavignac/plugin.log', 'a') as f:
-        print(*args, **kwargs, file=f)
-
-
 @pynvim.plugin
 class TexSpell(object):
 
@@ -19,7 +14,6 @@ class TexSpell(object):
         self.backend = None
 
     def start(self):
-        log("start")
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
 
@@ -31,14 +25,11 @@ class TexSpell(object):
     @pynvim.autocmd('BufWritePost', pattern='*.tex')
     @auto_start
     def post_write(self):
-        log("post write")
-        self.nvim.err_write("Pouet")
         self.apply_texspell()
 
     @pynvim.command('TexSpellCheck')
     @auto_start
     def apply_texspell(self):
-        log("apply")
         filename = self.nvim.current.buffer.name
         self._errors = []
         highlighs = []
@@ -47,12 +38,11 @@ class TexSpell(object):
         for err in self.check_errors(filename):
             self._errors.append(err)
             highlighs.extend(self.highligh_range(err.start, err.end))
-            log(err)
             c += 1
 
-        log("c =", c)
-        self.nvim.current.buffer.update_highlights(self.hi_src_id, highlighs)
         self.nvim.err_write("Found {} errors.".format(c))
+
+        self.nvim.current.buffer.update_highlights(self.hi_src_id, highlighs)
 
     def check_errors(self, filename):
         root = parse_with_default(filename)
