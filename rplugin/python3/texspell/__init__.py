@@ -27,6 +27,11 @@ class TexSpell(object):
     def post_write(self):
         self.apply_texspell()
 
+    @pynvim.autocmd('VimLeave')
+    def terminate(self):
+        if self.backend is not None:
+            self.backend.terminate()
+
     @pynvim.command('TexSpellCheck')
     @auto_start
     def apply_texspell(self):
