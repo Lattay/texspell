@@ -15,6 +15,8 @@ class Backend:
         self.nvim = nvim
 
     def error(self, msg):
+        if not msg.endswith('\n'):
+            msg += '\n'
         self.nvim.err_write(msg)
 
     def terminate(self):
@@ -44,16 +46,26 @@ def load_backend(nvim):
 
 
 def mkmkpos(source):
+    '''
+    Precompute data to convert a raw offset in term of bytes into a TextPos
+    in term of codepoint.
+    '''
+    blines = source.encode('utf8').split(b'\n')
+    blines_length = [len(line) for line in blines]
+
     lines = source.split('\n')
     lines_length = [len(line) for line in lines]
 
-    def mkpos(source, offset):
+    def mkpos(offset):
         i = 0
         shift = 0
-        while offset > shift:
-            shift += 1 + lines_length[i]
+        while offset > shift + blines_length[i] + 1:
+            shift += 1 + blines_length[i]
             i += 1
-        return TextPos(offset, i, offset - shift + 1)
+
+        cp_column = len(blines[i][:offset - shift + 1].decode('utf8')) - 1
+        cp_offset = sum(lines_length[:i]) + cp_column
+        return TextPos(cp_offset, cp_column, i)
 
     return mkpos
 

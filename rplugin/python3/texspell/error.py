@@ -9,6 +9,12 @@ class SpellError:
         self._alt_file = 'anonym'
         self.source_side = source_side
 
+    def contains(self, pos):
+        c = pos[1]
+        ln = pos[0] - 1
+        return (self.start.line <= ln and (self.start.col <= c or self.start.line < ln)
+                and self.end.line >= ln and (self.end.col >= c or self.end.line < ln))
+
     def __str__(self):
         return '<SpellError: ' + self.message + '>'
 

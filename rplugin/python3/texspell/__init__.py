@@ -12,10 +12,17 @@ class TexSpell(object):
     def __init__(self, nvim):
         self.nvim = nvim
         self.backend = None
+        self._errors = []
 
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
+
+    @auto_start
+    def echo(self, *msg):
+        for m in msg:
+            quotem = m.replace("'", "''")
+            self.nvim.command("echom '{}'".format(quotem))
 
     @pynvim.command('TexSpellChange', nargs='1')
     @auto_start
@@ -23,29 +30,39 @@ class TexSpell(object):
         self.backend = load_backend(args[0])
 
     @pynvim.autocmd('BufWritePost', pattern='*.tex')
-    @auto_start
     def post_write(self):
-        self.apply_texspell()
+        self.make_check()
 
     @pynvim.autocmd('VimLeave')
     def terminate(self):
         if self.backend is not None:
             self.backend.terminate()
 
+    @pynvim.autocmd('CursorMoved')
+    def show_message(self, *args):
+        pos = self.nvim.current.window.cursor
+        for err in self._errors:
+            if err.contains(pos):
+                self.echo(err.message)
+                return
+
     @pynvim.command('TexSpellCheck')
+    def texspellcheck(self):
+        self.make_check()
+
     @auto_start
-    def apply_texspell(self):
+    def make_check(self):
         filename = self.nvim.current.buffer.name
         self._errors = []
         highlighs = []
+        tp = []
 
         c = 0
         for err in self.check_errors(filename):
             self._errors.append(err)
             highlighs.extend(self.highligh_range(err.start, err.end))
+            tp.append((err.start, err.end))
             c += 1
-
-        self.nvim.err_write("Found {} errors.".format(c))
 
         self.nvim.current.buffer.update_highlights(self.hi_src_id, highlighs)
 
@@ -65,9 +82,9 @@ class TexSpell(object):
             lst = []
             if start.line < end.line:
                 lst.append((hi_id, start.line, start.col, 2000))
-                start.newline()
+                start.new_line()
             while start.line < end.line:
                 lst.append((hi_id, start.line))
-                start = start.newline()
+                start = start.new_line()
             lst.append((hi_id, start.line, start.col, end.col))
             return lst

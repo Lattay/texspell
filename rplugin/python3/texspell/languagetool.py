@@ -70,6 +70,7 @@ class LanguageToolServer:
     def __enter__(self):
         if not os.path.exists(self.lock_path):
             Thread(target=self.watchdog).start()
+            time.sleep(3)
         return None
 
     def __exit__(self, *args):
@@ -90,6 +91,7 @@ class LanguageToolServerInterface(LanguageToolInterface):
         self.port = port
         self.url = 'http://localhost:{}/v2/check'.format(self.port)
         self.server = LanguageToolServer(self.jar, self.port)
+        self.enabledOnly = True
 
     def request(self, content):
         data = urlencode({
@@ -105,11 +107,10 @@ class LanguageToolServerInterface(LanguageToolInterface):
 
     def check(self, source):
         with self.server:
-            with urlopen(self.request(source), timeout=1) as resp:
+            with urlopen(self.request(source), timeout=20) as resp:
                 body = resp.read().decode('utf')
                 if resp.status // 100 >= 4:
                     raise SubProcessError('Server error.' + body)
-            raise SubProcessError('Its ok here.')
         return self.parse(body)['matches']
 
     def terminate(self):
