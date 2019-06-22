@@ -70,23 +70,17 @@ def mkmkpos(source):
     Precompute data to convert a raw offset in term of bytes into a TextPos
     in term of codepoint.
     '''
-    blines = source.encode('utf8').split(b'\n')
-    bcum_length = [0 for _ in range(len(blines) + 1)]
-    for i, line in enumerate([''] + blines):
-        bcum_length[i] = len(line) + 1 + (bcum_length[i - 1] if i > 0 else 0)
-
     lines = source.split('\n')
     cum_length = [0 for line in lines]
     for i, line in enumerate([''] + lines[:-1]):
-        cum_length[i] = len(line) + 1 + (cum_length[i - 1] if i > 0 else 0)
+        cum_length[i] = len(line) + 1 + ((cum_length[i - 1]) if i > 0 else 0)
 
     def mkpos(offset):
-        i = find_line(offset, bcum_length)
-        shift = bcum_length[i]
-        log('shift: {}, i: {}, offset: {}', shift, i, offset)
+        i = find_line(offset, cum_length)
+        shift = cum_length[i]
 
-        cp_column = len(blines[i][:offset - shift].decode('utf8'))
-        cp_offset = cum_length[i] + cp_column + 1
+        cp_column = offset - shift + (1 if i == 0 else 0)
+        cp_offset = cum_length[i] + cp_column
         return TextPos(cp_offset, cp_column, i + 1)
 
     return mkpos
@@ -110,16 +104,28 @@ class LanguageTool(Backend):
         mkpos = mkmkpos(source)
         try:
             for err in self.server.check(source):
-                offset = err['offset']
-                length = err['context']['length']
-                start = mkpos(offset + 1)
-                end = mkpos(offset + length)
-                yield SpellError(
-                    start, end, err['message'], short=err['shortMessage'],
-                    code=err['rule']['id']
-                )
+                yield self.make_error(err, mkpos)
         except Exception as e:
             self.error('Something wrong happened: {}'.format(e))
+
+    def make_error(self, err, mkpos):
+        offset = err['offset']
+        length = err['length']
+        start = mkpos(offset + 1)
+        end = mkpos(offset + length)
+
+        error = SpellError(
+            start, end, err['message'], short=err['shortMessage'],
+            context=err['context']['text'],
+            code=err['rule']['id']
+        )
+
+        if err['type'].get('typeName', None) == 'UnknownWord':
+            st = err['context']['offset']
+            en = st + err['context']['length'] + 1
+            error.message += ': ' + err['context']['text'][st:en]
+
+        return error
 
     def terminate(self):
         if self.server is not None:

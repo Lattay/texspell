@@ -1,6 +1,7 @@
 import pynvim
 
 from protex import parse_with_default
+from protex.text_pos import TextPos
 
 from .tools import auto_start, log
 from .backend import load_backend
@@ -13,16 +14,58 @@ class TexSpell(object):
         self.nvim = nvim
         self.backend = None
         self._errors = []
+        self.lines = {}
+
+        self.pos = TextPos(-1, 0, 0)
 
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
+
+    def clear_errors(self):
+        self._errors.clear()
+
+    def insert_error(self, err):
+        a, b, m = 0, len(self._errors) - 1, 0
+        while a + 1 < b:
+            m = (a + b) // 2
+            if self._errors[m].start > err.start:
+                b = m
+            elif self._errors[m].start < err.start:
+                a = m
+            else:
+                a = b = m
+        self._errors.insert(m, err)
+
+    def get_surround_errors(self, pos):
+        a, b, m = 0, len(self._err) - 1, 0
+        while a + 1 < b:
+            m = (a + b) // 2
+            if self._err[m].start > pos:
+                b = m
+            elif self._err[m].start < pos:
+                a = m
+            else:
+                a = max(0, m - 1)
+                b = min(len(self._err), m + 1)
+        return self._err[a], self._err[b]
 
     @auto_start
     def echo(self, *msg):
         for m in msg:
             quotem = m.replace("'", "''")
             self.nvim.command("echom '{}'".format(quotem))
+
+    @pynvim.command('TexSpellJumpNext', nargs='0')
+    def jump_next(self):
+        self.jump_to(1)
+
+    @pynvim.command('TexSpellJumpPrev', nargs='0')
+    def jump_prev(self):
+        self.jump_to(-1)
+
+    def jump_to(self, direct):
+        prev, next = self.get_surround_errors(self.pos)
 
     @pynvim.command('TexSpellChange', nargs='1')
     @auto_start
@@ -31,23 +74,23 @@ class TexSpell(object):
 
     @pynvim.autocmd('BufWritePost', pattern='*.tex')
     def post_write(self):
+        self.lines = {}
         self.make_check()
 
-    @pynvim.autocmd('VimLeave')
+    @pynvim.autocmd('VimLeave', pattern='*.tex')
     def terminate(self):
         if self.backend is not None:
             self.backend.terminate()
 
-    @pynvim.autocmd('CursorMoved')
+    @pynvim.autocmd('CursorMoved', pattern='*.tex')
     def show_message(self):
-        pos = self.nvim.current.window.cursor
+        row, col = self.nvim.current.window.cursor
+        self.pos = TextPos(-1, col + 1, row - 1)
         for err in self._errors:
-            c = pos[1]
-            ln = pos[0]
-            log('L{}C{} // {}-{}', ln, c, err.start, err.end)
-            if err.contains(c, ln):
+            if err.start <= self.pos <= err.end:
                 self.echo(err.message)
                 return
+        self.echo('')
 
     @pynvim.command('TexSpellCheck')
     def texspellcheck(self):
@@ -56,18 +99,17 @@ class TexSpell(object):
     @auto_start
     def make_check(self):
         filename = self.nvim.current.buffer.name
-        self._errors = []
-        highlighs = []
-        tp = []
+        self.clear_errors()
+
+        self.highlights = []
 
         c = 0
         for err in self.check_errors(filename):
-            self._errors.append(err)
-            highlighs.extend(self.highligh_range(err.start, err.end))
-            tp.append((err.start, err.end))
+            self.insert_error(err)
+            self.highligh_error(err)
             c += 1
 
-        self.nvim.current.buffer.update_highlights(self.hi_src_id, highlighs)
+        self.nvim.current.buffer.update_highlights(self.hi_src_id, self.highlights)
 
     def check_errors(self, filename):
         root = parse_with_default(filename)
@@ -75,9 +117,9 @@ class TexSpell(object):
         log(source)
         pos_map = root.dump_pos_map()
         for err in self.backend.check(source):
-            log('{}-{}', err.start, err.end)
             err.toggle_pos_mode(pos_map)
-            log('{}-{}:\n{}', err.start, err.end, err.message)
+            err.start.col = self.get_true_column(err.start.line, err.start.col)
+            err.end.col = self.get_true_column(err.end.line, err.end.col)
             yield err
 
     @auto_start
@@ -87,10 +129,21 @@ class TexSpell(object):
         else:
             lst = []
             if start.line < end.line:
-                lst.append((hi_id, start.line - 1, start.col, 2000))
-                start.new_line()
-            while start.line < end.line:
-                lst.append((hi_id, start.line - 1))
+                yield (hi_id, start.line - 1, start.col - 1, -1)
                 start = start.new_line()
-            lst.append((hi_id, start.line - 1, start.col, end.col))
+            while start.line < end.line:
+                yield (hi_id, start.line - 1, 0, -1)
+                start = start.new_line()
+            yield (hi_id, start.line - 1, start.col - 1, end.col)
             return lst
+
+    def get_true_column(self, ln, col):
+        if ln not in self.lines:
+            self.lines[ln] = self.nvim.current.buffer[ln - 1]
+        line = self.lines[ln]
+        return col + len(line[:col].encode('utf8')) - len(line[:col])
+
+    @auto_start
+    def highligh_error(self, err):
+        for id, ln, start, end in self.highligh_range(err.start, err.end):
+            self.highlights.append((id, ln, start, end))

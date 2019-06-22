@@ -1,5 +1,5 @@
 class SpellError:
-    def __init__(self, start, end, msg, source_side=False, short='', filename='anonym', code='err'):
+    def __init__(self, start, end, msg, context='', source_side=False, short='', filename='anonym', code='err'):
         self.start = start
         self.end = end
         self.message = msg
@@ -8,10 +8,7 @@ class SpellError:
         self.filename = filename
         self._alt_file = 'anonym'
         self.source_side = source_side
-
-    def contains(self, c, ln):
-        return (self.start.line <= ln and (self.start.col <= c or self.start.line < ln)
-                and self.end.line >= ln and (self.end.col >= c or self.end.line < ln))
+        self.context = context
 
     def __str__(self):
         return '<SpellError: ' + self.message + '>'

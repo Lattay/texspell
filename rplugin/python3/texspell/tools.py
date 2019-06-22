@@ -20,7 +20,7 @@ def log(s, *args):
             msg = s.format(*args)
         else:
             msg = s
-        f.write('[INFO-{0}]\n{1}\n[{0}]\n'.format(sign(), msg))
+        f.write('[INFO-{0}]\n{1}[{0}]\n'.format(sign(), msg))
 
 
 def auto_start(method):
