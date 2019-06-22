@@ -26,6 +26,12 @@ class TexSpell(object):
         self._errors.clear()
 
     def insert_error(self, err):
+        if not self._errors or err.start > self._errors[-1].start:
+            self._errors.append(err)
+
+        if err.start < self._errors[0].start:
+            self._errors.insert(0, err)
+
         a, b, m = 0, len(self._errors) - 1, 0
         while a + 1 < b:
             m = (a + b) // 2
@@ -38,17 +44,24 @@ class TexSpell(object):
         self._errors.insert(m, err)
 
     def get_surround_errors(self, pos):
-        a, b, m = 0, len(self._err) - 1, 0
+        if not self._errors:
+            return None, None
+        if pos < self._errors[0].start or pos > self._errors[-1].start:
+            return self._errors[-1], self._errors[0]
+
+        a, b, m = 0, len(self._errors) - 1, 0
+
         while a + 1 < b:
             m = (a + b) // 2
-            if self._err[m].start > pos:
+            if self._errors[m].start <= pos <= self._errors[m].end:
+                a = max(-1, m - 1)
+                b = (m + 1) % len(self._errors)
+                break
+            elif self._errors[m].start > pos:
                 b = m
-            elif self._err[m].start < pos:
+            elif self._errors[m].start < pos:
                 a = m
-            else:
-                a = max(0, m - 1)
-                b = min(len(self._err), m + 1)
-        return self._err[a], self._err[b]
+        return self._errors[a], self._errors[b]
 
     @auto_start
     def echo(self, *msg):
@@ -57,15 +70,24 @@ class TexSpell(object):
             self.nvim.command("echom '{}'".format(quotem))
 
     @pynvim.command('TexSpellJumpNext', nargs='0')
-    def jump_next(self):
+    def jump_next(self, args):
+        log('{}', args)
         self.jump_to(1)
 
     @pynvim.command('TexSpellJumpPrev', nargs='0')
-    def jump_prev(self):
+    def jump_prev(self, args):
+        log('{}', args)
         self.jump_to(-1)
 
     def jump_to(self, direct):
         prev, next = self.get_surround_errors(self.pos)
+        pos = None
+        if direct == 1 and next is not None:
+            pos = (next.start.line, next.start.col - 1)
+        elif direct == -1 and prev is not None:
+            pos = (prev.start.line, prev.start.col - 1)
+        if pos is not None:
+            self.nvim.current.window.cursor = pos
 
     @pynvim.command('TexSpellChange', nargs='1')
     @auto_start
@@ -85,7 +107,7 @@ class TexSpell(object):
     @pynvim.autocmd('CursorMoved', pattern='*.tex')
     def show_message(self):
         row, col = self.nvim.current.window.cursor
-        self.pos = TextPos(-1, col + 1, row - 1)
+        self.pos = TextPos(-1, col - 1, row)
         for err in self._errors:
             if err.start <= self.pos <= err.end:
                 self.echo(err.message)
@@ -114,7 +136,6 @@ class TexSpell(object):
     def check_errors(self, filename):
         root = parse_with_default(filename)
         source = root.render()
-        log(source)
         pos_map = root.dump_pos_map()
         for err in self.backend.check(source):
             err.toggle_pos_mode(pos_map)
