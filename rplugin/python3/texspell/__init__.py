@@ -2,7 +2,7 @@ import pynvim
 
 from protex import parse_with_default
 
-from .tools import auto_start
+from .tools import auto_start, log
 from .backend import load_backend
 
 
@@ -39,10 +39,13 @@ class TexSpell(object):
             self.backend.terminate()
 
     @pynvim.autocmd('CursorMoved')
-    def show_message(self, *args):
+    def show_message(self):
         pos = self.nvim.current.window.cursor
         for err in self._errors:
-            if err.contains(pos):
+            c = pos[1]
+            ln = pos[0]
+            log('L{}C{} // {}-{}', ln, c, err.start, err.end)
+            if err.contains(c, ln):
                 self.echo(err.message)
                 return
 
@@ -69,9 +72,12 @@ class TexSpell(object):
     def check_errors(self, filename):
         root = parse_with_default(filename)
         source = root.render()
+        log(source)
         pos_map = root.dump_pos_map()
         for err in self.backend.check(source):
+            log('{}-{}', err.start, err.end)
             err.toggle_pos_mode(pos_map)
+            log('{}-{}:\n{}', err.start, err.end, err.message)
             yield err
 
     @auto_start
@@ -81,10 +87,10 @@ class TexSpell(object):
         else:
             lst = []
             if start.line < end.line:
-                lst.append((hi_id, start.line, start.col, 2000))
+                lst.append((hi_id, start.line - 1, start.col, 2000))
                 start.new_line()
             while start.line < end.line:
-                lst.append((hi_id, start.line))
+                lst.append((hi_id, start.line - 1))
                 start = start.new_line()
-            lst.append((hi_id, start.line, start.col, end.col))
+            lst.append((hi_id, start.line - 1, start.col, end.col))
             return lst

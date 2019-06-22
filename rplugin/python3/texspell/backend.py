@@ -4,7 +4,7 @@ import os
 from protex.text_pos import TextPos
 
 from .error import SpellError
-from .tools import auto_start
+from .tools import auto_start, log
 
 from .languagetool import LanguageToolServerInterface
 
@@ -45,27 +45,49 @@ def load_backend(nvim):
     return _backend_map.get(name, NotABackend)(name, nvim)
 
 
+def find_line(n, cumsum):
+    '''
+    Binary search in cumsum.
+    '''
+    if not cumsum:
+        return 0
+    a, b = 0, len(cumsum) - 1
+    m = (a + b) // 2
+    while a + 1 < b:
+        if cumsum[m] == n:
+            return m
+        elif cumsum[m] > n:
+            b = m
+            m = (a + b) // 2
+        else:
+            a = m
+            m = (a + b) // 2
+    return a
+
+
 def mkmkpos(source):
     '''
     Precompute data to convert a raw offset in term of bytes into a TextPos
     in term of codepoint.
     '''
     blines = source.encode('utf8').split(b'\n')
-    blines_length = [len(line) for line in blines]
+    bcum_length = [0 for _ in range(len(blines) + 1)]
+    for i, line in enumerate([''] + blines):
+        bcum_length[i] = len(line) + 1 + (bcum_length[i - 1] if i > 0 else 0)
 
     lines = source.split('\n')
-    lines_length = [len(line) for line in lines]
+    cum_length = [0 for line in lines]
+    for i, line in enumerate([''] + lines[:-1]):
+        cum_length[i] = len(line) + 1 + (cum_length[i - 1] if i > 0 else 0)
 
     def mkpos(offset):
-        i = 0
-        shift = 0
-        while offset > shift + blines_length[i] + 1:
-            shift += 1 + blines_length[i]
-            i += 1
+        i = find_line(offset, bcum_length)
+        shift = bcum_length[i]
+        log('shift: {}, i: {}, offset: {}', shift, i, offset)
 
-        cp_column = len(blines[i][:offset - shift + 1].decode('utf8')) - 1
-        cp_offset = sum(lines_length[:i]) + cp_column
-        return TextPos(cp_offset, cp_column, i)
+        cp_column = len(blines[i][:offset - shift].decode('utf8'))
+        cp_offset = cum_length[i] + cp_column + 1
+        return TextPos(cp_offset, cp_column, i + 1)
 
     return mkpos
 
@@ -90,7 +112,7 @@ class LanguageTool(Backend):
             for err in self.server.check(source):
                 offset = err['offset']
                 length = err['context']['length']
-                start = mkpos(offset)
+                start = mkpos(offset + 1)
                 end = mkpos(offset + length)
                 yield SpellError(
                     start, end, err['message'], short=err['shortMessage'],
