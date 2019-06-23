@@ -28,9 +28,11 @@ class TexSpell(object):
     def insert_error(self, err):
         if not self._errors or err.start > self._errors[-1].start:
             self._errors.append(err)
+            return
 
         if err.start < self._errors[0].start:
             self._errors.insert(0, err)
+            return
 
         a, b, m = 0, len(self._errors) - 1, 0
         while a + 1 < b:
@@ -40,7 +42,7 @@ class TexSpell(object):
             elif self._errors[m].start < err.start:
                 a = m
             else:
-                a = b = m
+                break
         self._errors.insert(m, err)
 
     def get_surround_errors(self, pos):
@@ -71,23 +73,26 @@ class TexSpell(object):
 
     @pynvim.command('TexSpellJumpNext', nargs='0')
     def jump_next(self, args):
-        log('{}', args)
         self.jump_to(1)
 
     @pynvim.command('TexSpellJumpPrev', nargs='0')
     def jump_prev(self, args):
-        log('{}', args)
         self.jump_to(-1)
 
+    @auto_start
     def jump_to(self, direct):
-        prev, next = self.get_surround_errors(self.pos)
+        prev, next_ = self.get_surround_errors(self.pos)
         pos = None
-        if direct == 1 and next is not None:
-            pos = (next.start.line, next.start.col - 1)
+
+        if direct == 1 and next_ is not None:
+            pos = next_.start
         elif direct == -1 and prev is not None:
-            pos = (prev.start.line, prev.start.col - 1)
+            pos = prev.start
+
         if pos is not None:
-            self.nvim.current.window.cursor = pos
+            self.nvim.current.window.cursor = (
+                pos.line, pos.col - (0 if pos.line == 1 else 1)
+            )
 
     @pynvim.command('TexSpellChange', nargs='1')
     @auto_start
@@ -107,7 +112,7 @@ class TexSpell(object):
     @pynvim.autocmd('CursorMoved', pattern='*.tex')
     def show_message(self):
         row, col = self.nvim.current.window.cursor
-        self.pos = TextPos(-1, col - 1, row)
+        self.pos = TextPos(-1, col + (0 if row == 1 else 1), row)
         for err in self._errors:
             if err.start <= self.pos <= err.end:
                 self.echo(err.message)
@@ -138,9 +143,12 @@ class TexSpell(object):
         source = root.render()
         pos_map = root.dump_pos_map()
         for err in self.backend.check(source):
+            log('Before: {} {}', err.message, err.start)
             err.toggle_pos_mode(pos_map)
+            log('After: {} {}', err.message, err.start)
             err.start.col = self.get_true_column(err.start.line, err.start.col)
             err.end.col = self.get_true_column(err.end.line, err.end.col)
+            log('Finally: {} {}', err.message, err.start)
             yield err
 
     @auto_start
@@ -150,12 +158,15 @@ class TexSpell(object):
         else:
             lst = []
             if start.line < end.line:
-                yield (hi_id, start.line - 1, start.col - 1, -1)
+                yield (hi_id, start.line - 1,
+                       start.col - (0 if start.line == 1 else 1), -1)
                 start = start.new_line()
             while start.line < end.line:
                 yield (hi_id, start.line - 1, 0, -1)
                 start = start.new_line()
-            yield (hi_id, start.line - 1, start.col - 1, end.col)
+            yield (hi_id, start.line - 1,
+                   start.col - (0 if start.line == 1 else 1),
+                   end.col + (1 if start.line == 1 else 0))
             return lst
 
     def get_true_column(self, ln, col):

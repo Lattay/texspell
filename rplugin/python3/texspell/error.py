@@ -1,5 +1,5 @@
 class SpellError:
-    def __init__(self, start, end, msg, context='', source_side=False, short='', filename='anonym', code='err'):
+    def __init__(self, start, end, msg, context='', raw=None, source_side=False, short='', filename='anonym', code='err'):
         self.start = start
         self.end = end
         self.message = msg
@@ -9,6 +9,7 @@ class SpellError:
         self._alt_file = 'anonym'
         self.source_side = source_side
         self.context = context
+        self.raw = raw
 
     def __str__(self):
         return '<SpellError: ' + self.message + '>'

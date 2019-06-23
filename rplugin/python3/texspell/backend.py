@@ -79,7 +79,7 @@ def mkmkpos(source):
         i = find_line(offset, cum_length)
         shift = cum_length[i]
 
-        cp_column = offset - shift + (1 if i == 0 else 0)
+        cp_column = offset - shift
         cp_offset = cum_length[i] + cp_column
         return TextPos(cp_offset, cp_column, i + 1)
 
@@ -117,7 +117,7 @@ class LanguageTool(Backend):
         error = SpellError(
             start, end, err['message'], short=err['shortMessage'],
             context=err['context']['text'],
-            code=err['rule']['id']
+            code=err['rule']['id'], raw=err
         )
 
         if err['type'].get('typeName', None) == 'UnknownWord':
