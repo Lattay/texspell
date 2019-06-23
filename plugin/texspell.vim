@@ -8,6 +8,6 @@ let g:texspell_languagetool_port = get(g:, 'texspell_languagetool_port', 8888)
 hi TexSpellError gui=none guifg=#3C3836 guibg=#FB4934 ctermfg=white ctermbg=red
 
 " Available mappings
-nnoremap <silent> <Plug>(texspell_jump_next) :TexSpellJumpNext<CR>
-nnoremap <silent> <Plug>(texspell_jump_prev) :TexSpellJumpPrev<CR>
-nnoremap <silent> <Plug>(texspell_check) :TexSpellJumpPrev<CR>
+noremap <silent> <Plug>(texspell_jump_next) <Cmd>TexSpellJumpNext<CR>
+noremap <silent> <Plug>(texspell_jump_prev) <Cmd>TexSpellJumpPrev<CR>
+noremap <silent> <Plug>(texspell_check) <Cmd>TexSpellJumpPrev<CR>
