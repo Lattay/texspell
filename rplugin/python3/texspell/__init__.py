@@ -9,6 +9,48 @@ from .backend import load_backend
 
 @pynvim.plugin
 class TexSpell(object):
+    '''
+    Definition of the TexSpell Neovim plugin.
+    See README.md for more informations.
+    '''
+
+    @pynvim.command('TexSpellStart', nargs='0')
+    @auto_start
+    def texspell_change(self, args):
+        '''
+        Force everything to start and be ready.
+        '''
+        list(self.backend.check(''))
+
+    @pynvim.command('TexSpellCheck')
+    def texspellcheck(self):
+        self.make_check()
+
+    @pynvim.command('TexSpellJumpNext')
+    def jump_next(self):
+        self.jump_to(1)
+
+    @pynvim.command('TexSpellJumpPrev')
+    def jump_prev(self):
+        self.jump_to(-1)
+
+    @pynvim.command('TexSpellMessage')
+    def show_message(self):
+        self.update_pos()
+        for err in self._errors:
+            if err.start <= self.pos <= err.end:
+                self.echo(err.message)
+                return
+        self.echo('')
+
+    @pynvim.autocmd('BufWritePost', pattern='*.tex')
+    def post_write(self):
+        self.lines = {}
+
+    @pynvim.autocmd('VimLeave', pattern='*.tex')
+    def terminate(self):
+        if self.backend is not None:
+            self.backend.terminate()
 
     def __init__(self, nvim):
         self.nvim = nvim
@@ -21,6 +63,11 @@ class TexSpell(object):
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
+
+    def update_pos(self):
+        row, col = self.nvim.current.window.cursor
+        self.pos = TextPos(-1, col + (0 if row == 1 else 1), row)
+
 
     def clear_errors(self):
         self._errors.clear()
@@ -66,21 +113,8 @@ class TexSpell(object):
         return self._errors[a], self._errors[b]
 
     @auto_start
-    def echo(self, *msg):
-        for m in msg:
-            quotem = m.replace("'", "''")
-            self.nvim.command("echom '{}'".format(quotem))
-
-    @pynvim.command('TexSpellJumpNext', nargs='0')
-    def jump_next(self, args):
-        self.jump_to(1)
-
-    @pynvim.command('TexSpellJumpPrev', nargs='0')
-    def jump_prev(self, args):
-        self.jump_to(-1)
-
-    @auto_start
     def jump_to(self, direct):
+        self.update_pos()
         prev, next_ = self.get_surround_errors(self.pos)
         pos = None
 
@@ -94,34 +128,11 @@ class TexSpell(object):
                 pos.line, pos.col - (0 if pos.line == 1 else 1)
             )
 
-    @pynvim.command('TexSpellChange', nargs='1')
     @auto_start
-    def texspell_change(self, args):
-        self.backend = load_backend(args[0])
-
-    @pynvim.autocmd('BufWritePost', pattern='*.tex')
-    def post_write(self):
-        self.lines = {}
-        self.make_check()
-
-    @pynvim.autocmd('VimLeave', pattern='*.tex')
-    def terminate(self):
-        if self.backend is not None:
-            self.backend.terminate()
-
-    @pynvim.autocmd('CursorMoved', pattern='*.tex')
-    def show_message(self):
-        row, col = self.nvim.current.window.cursor
-        self.pos = TextPos(-1, col + (0 if row == 1 else 1), row)
-        for err in self._errors:
-            if err.start <= self.pos <= err.end:
-                self.echo(err.message)
-                return
-        self.echo('')
-
-    @pynvim.command('TexSpellCheck')
-    def texspellcheck(self):
-        self.make_check()
+    def echo(self, *msg):
+        for m in msg:
+            quotem = m.replace("'", "''")
+            self.nvim.command("echom '{}'".format(quotem))
 
     @auto_start
     def make_check(self):
