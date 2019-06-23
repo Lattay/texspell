@@ -1,4 +1,6 @@
 import pynvim
+from operator import attrgetter
+from bisect import bisect
 
 from protex import parse_with_default
 from protex.text_pos import TextPos
@@ -56,6 +58,7 @@ class TexSpell(object):
         self.nvim = nvim
         self.backend = None
         self._errors = []
+        self._positions = []
         self.lines = {}
 
         self.pos = TextPos(-1, 0, 0)
@@ -68,49 +71,19 @@ class TexSpell(object):
         row, col = self.nvim.current.window.cursor
         self.pos = TextPos(-1, col + (0 if row == 1 else 1), row)
 
-
     def clear_errors(self):
         self._errors.clear()
-
-    def insert_error(self, err):
-        if not self._errors or err.start > self._errors[-1].start:
-            self._errors.append(err)
-            return
-
-        if err.start < self._errors[0].start:
-            self._errors.insert(0, err)
-            return
-
-        a, b, m = 0, len(self._errors) - 1, 0
-        while a + 1 < b:
-            m = (a + b) // 2
-            if self._errors[m].start > err.start:
-                b = m
-            elif self._errors[m].start < err.start:
-                a = m
-            else:
-                break
-        self._errors.insert(m, err)
 
     def get_surround_errors(self, pos):
         if not self._errors:
             return None, None
-        if pos < self._errors[0].start or pos > self._errors[-1].start:
-            return self._errors[-1], self._errors[0]
+        if pos <= self._positions[0] or pos >= self._positions[-1]:
+            return self._positions[-1], self._positions[0]
 
-        a, b, m = 0, len(self._errors) - 1, 0
-
-        while a + 1 < b:
-            m = (a + b) // 2
-            if self._errors[m].start <= pos <= self._errors[m].end:
-                a = max(-1, m - 1)
-                b = (m + 1) % len(self._errors)
-                break
-            elif self._errors[m].start > pos:
-                b = m
-            elif self._errors[m].start < pos:
-                a = m
-        return self._errors[a], self._errors[b]
+        m = bisect(self._positions, pos)
+        if pos == self._positions[m - 1]:
+            return self._positions[(m - 2) % len(self._positions)]
+        return self._positions[m - 1], self._positions[m]
 
     @auto_start
     def jump_to(self, direct):
@@ -119,9 +92,9 @@ class TexSpell(object):
         pos = None
 
         if direct == 1 and next_ is not None:
-            pos = next_.start
+            pos = next_
         elif direct == -1 and prev is not None:
-            pos = prev.start
+            pos = prev
 
         if pos is not None:
             self.nvim.current.window.cursor = (
@@ -143,9 +116,12 @@ class TexSpell(object):
 
         c = 0
         for err in self.check_errors(filename):
-            self.insert_error(err)
+            self._errors.append(err)
             self.highligh_error(err)
             c += 1
+
+        self._errors.sort(key=attrgetter('start'))
+        self._positions = [err.start for err in self._errors]
 
         self.nvim.current.buffer.update_highlights(self.hi_src_id, self.highlights)
 
