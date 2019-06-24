@@ -82,7 +82,7 @@ class TexSpell(object):
 
         m = bisect(self._positions, pos)
         if pos == self._positions[m - 1]:
-            return self._positions[(m - 2) % len(self._positions)]
+            return self._positions[(m - 2) % len(self._positions)], self._positions[m]
         return self._positions[m - 1], self._positions[m]
 
     @auto_start
