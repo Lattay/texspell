@@ -1,5 +1,6 @@
 from functools import wraps
 from random import choices
+from os import environ
 
 
 def sign():
@@ -8,8 +9,12 @@ def sign():
 
 _first_log = True
 
+_debug = environ['TEXSPELL_DEBUG'] == 'yes'
+
 
 def log(s, *args):
+    if not _debug:
+        return
     global _first_log
     flag = 'a'
     if _first_log:
