@@ -88,6 +88,9 @@ messages will be shown as soon as the cursor enter an error zone.
 
 # Disclaimer
 
+This is still a work in progress and it have some bugs. If you know how to fix
+one of them tell me !
+
 For now everything is quite slow !
 I think it is mostly because languagetool is but I do not exclude my own code from the problem yet.
 You will see that it takes several seconds before the errors updated after you launched a check and that
@@ -97,3 +100,8 @@ I hope to improve that in the future but if it appear to be mostly because of la
 
 Note however that only one instance hold the server so if you open several instances of neovim,
 the other will not be affected by the startup and exit delay of the server.
+
+# Contributing
+
+All contributions are welcomed. If you want to fix a bug or implement a new
+backend feel free to submit a pull request.
