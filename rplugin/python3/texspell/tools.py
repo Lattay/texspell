@@ -9,7 +9,7 @@ def sign():
 
 _first_log = True
 
-_debug = environ['TEXSPELL_DEBUG'] == 'yes'
+_debug = environ.get('TEXSPELL_DEBUG', 'no') == 'yes'
 
 
 def log(s, *args):
