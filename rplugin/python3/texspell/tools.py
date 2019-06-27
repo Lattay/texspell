@@ -38,3 +38,13 @@ def auto_start(method):
             self._ready = True
         return method(self, *args, **kwargs)
     return wrapper
+
+
+def switchable(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if getattr(self, 'enabled', False):
+            return method(self, *args, **kwargs)
+        else:
+            return None
+    return wrapper

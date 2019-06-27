@@ -5,7 +5,7 @@ from bisect import bisect
 from protex import parse_with_default
 from protex.text_pos import TextPos
 
-from .tools import auto_start, log
+from .tools import auto_start, switchable, log
 from .backend import load_backend
 
 
@@ -16,27 +16,51 @@ class TexSpell(object):
     See README.md for more informations.
     '''
 
-    @pynvim.command('TexSpellStart', nargs='0')
+    @pynvim.command('TexSpellStart')
+    @switchable
     @auto_start
-    def texspell_change(self, args):
+    def texspell_start(self):
         '''
         Force everything to start and be ready.
         '''
         list(self.backend.check(''))
 
+    @pynvim.command('TexSpellRestart')
+    @auto_start
+    def texspell_restart(self, args):
+        '''
+        Restart the checks.
+        '''
+        self.enable = True
+        self.backend = load_backend(self.nvim)
+        list(self.backend.check(''))
+
+    @pynvim.command('TexSpellStop')
+    @auto_start
+    def texspell_stop(self, args):
+        '''
+        Stop everything.
+        '''
+        self.enable = False
+        self.terminate()
+
     @pynvim.command('TexSpellCheck')
+    @switchable
     def texspellcheck(self):
         self.make_check()
 
     @pynvim.command('TexSpellJumpNext')
+    @switchable
     def jump_next(self):
         self.jump_to(1)
 
     @pynvim.command('TexSpellJumpPrev')
+    @switchable
     def jump_prev(self):
         self.jump_to(-1)
 
     @pynvim.command('TexSpellMessage')
+    @switchable
     def show_message(self):
         self.update_pos()
         for err in self._errors:
@@ -46,13 +70,16 @@ class TexSpell(object):
         self.echo('')
 
     @pynvim.autocmd('BufWritePost', pattern='*.tex')
+    @switchable
     def post_write(self):
         self.lines = {}
 
     @pynvim.autocmd('VimLeave', pattern='*.tex')
+    @switchable
     def terminate(self):
         if self.backend is not None:
             self.backend.terminate()
+            self.backend = None
 
     def __init__(self, nvim):
         self.nvim = nvim
@@ -66,6 +93,7 @@ class TexSpell(object):
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
+        self.enabled = True
 
     def update_pos(self):
         row, col = self.nvim.current.window.cursor
