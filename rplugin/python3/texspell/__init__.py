@@ -27,7 +27,7 @@ class TexSpell(object):
 
     @pynvim.command('TexSpellRestart')
     @auto_start
-    def texspell_restart(self, args):
+    def texspell_restart(self):
         '''
         Restart the checks.
         '''
@@ -36,8 +36,7 @@ class TexSpell(object):
         list(self.backend.check(''))
 
     @pynvim.command('TexSpellStop')
-    @auto_start
-    def texspell_stop(self, args):
+    def texspell_stop(self):
         '''
         Stop everything.
         '''
