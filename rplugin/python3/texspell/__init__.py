@@ -88,7 +88,7 @@ class TexSpell(object):
         self.lines = {}
 
         self.pos = TextPos(-1, 0, 0)
-        self.enable
+        self.enable = True
 
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
