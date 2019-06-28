@@ -16,6 +16,24 @@ class TexSpell(object):
     See README.md for more informations.
     '''
 
+    @pynvim.command('TexSpellEnable')
+    @auto_start
+    def texspell_restart(self):
+        '''
+        Enable the plugin.
+        '''
+        self.enable = True
+        self.backend = load_backend(self.nvim)
+        list(self.backend.check(''))
+
+    @pynvim.command('TexSpellDisable')
+    def texspell_stop(self):
+        '''
+        Disable the plugin and stop the backend.
+        '''
+        self.enable = False
+        self.terminate()
+
     @pynvim.command('TexSpellStart')
     @switchable
     @auto_start
@@ -24,24 +42,6 @@ class TexSpell(object):
         Force everything to start and be ready.
         '''
         list(self.backend.check(''))
-
-    @pynvim.command('TexSpellRestart')
-    @auto_start
-    def texspell_restart(self):
-        '''
-        Restart the checks.
-        '''
-        self.enable = True
-        self.backend = load_backend(self.nvim)
-        list(self.backend.check(''))
-
-    @pynvim.command('TexSpellStop')
-    def texspell_stop(self):
-        '''
-        Stop everything.
-        '''
-        self.enable = False
-        self.terminate()
 
     @pynvim.command('TexSpellCheck')
     @switchable
@@ -88,11 +88,12 @@ class TexSpell(object):
         self.lines = {}
 
         self.pos = TextPos(-1, 0, 0)
+        self.enable
 
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
         self.backend = load_backend(self.nvim)
-        self.enabled = True
+        self.enabled = bool(self.nvim.eval('get(g:, "texspell_disable", 0) || get(b:, "texspell_disable", 0)'))
 
     def update_pos(self):
         row, col = self.nvim.current.window.cursor

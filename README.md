@@ -44,12 +44,17 @@ TexSpell have some global variables for configuration.
 - *g:texspell_engine*: select the backend, by default 'languagetool'
 - *g:texspell_lang*: select the language, by default 'en', you can put whatever
   the backend support.
+- *g:texspell_disable* and *b:texspell_disable*: disable at startup, waiting for
+  a call to TexSpellEnable
 
 LanguageTool specific options:
 - *g:texspell_languagetool_path*: path to the installation directory
 - *g:texspell_languagetool_port*: port the server should be bound to
 
 Available commands:
+- TexSpellDisable: stop everything, disable checking, clear highlighting etc...
+  only TexSpellEnable have effect after this
+- TexSpellEnable: restart everything after TexSpellEnable
 - TexSpellStart: start whatever need to be started to make the check
 - TexSpellCheck: request a check, automatically start everything if
   TexSpellStart have not been used yet
@@ -105,3 +110,11 @@ the other will not be affected by the startup and exit delay of the server.
 
 All contributions are welcomed. If you want to fix a bug or implement a new
 backend feel free to submit a pull request.
+
+# TODO
+
+- [ ] Make things more incremental to improve speed. Maybe the best way would be to
+  identify paragraphs and do a request for each one, updating highlighting incrementally
+- [ ] Prevent errors to mess the screen with overly long messages
+- [ ] Implement new backends
+  - [ ] grammalecte
