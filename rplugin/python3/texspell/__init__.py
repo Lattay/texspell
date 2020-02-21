@@ -22,7 +22,7 @@ class TexSpell(object):
         '''
         Enable the plugin.
         '''
-        self.enable = True
+        self.enabled = True
         self.backend = load_backend(self.nvim)
         list(self.backend.check(''))
 
@@ -31,7 +31,7 @@ class TexSpell(object):
         '''
         Disable the plugin and stop the backend.
         '''
-        self.enable = False
+        self.enabled = False
         self.terminate()
 
     @pynvim.command('TexSpellStart')
@@ -99,7 +99,7 @@ class TexSpell(object):
         self.lines = {}
 
         self.pos = TextPos(-1, 0, 0)
-        self.enable = True
+        self.enabled = True
 
     def start(self):
         self.hi_src_id = self.nvim.new_highlight_source()
@@ -169,12 +169,10 @@ class TexSpell(object):
         source = root.render()
         pos_map = root.dump_pos_map()
         for err in self.backend.check(source):
-            log('Before: {} {}', err.message, err.start)
             err.toggle_pos_mode(pos_map)
-            log('After: {} {}', err.message, err.start)
             err.start.col = self.get_true_column(err.start.line, err.start.col)
             err.end.col = self.get_true_column(err.end.line, err.end.col)
-            log('Finally: {} {}', err.message, err.start)
+            log('{} {}', err.message, err.start)
             yield err
 
     @auto_start
