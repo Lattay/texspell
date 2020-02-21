@@ -1,5 +1,6 @@
 from warnings import warn
 import os
+import bisect
 
 from protex.text_pos import TextPos
 
@@ -66,18 +67,7 @@ def find_line(n, cumsum):
     '''
     if not cumsum:
         return 0
-    a, b = 0, len(cumsum) - 1
-    m = (a + b) // 2
-    while a + 1 < b:
-        if cumsum[m] == n:
-            return m
-        elif cumsum[m] > n:
-            b = m
-            m = (a + b) // 2
-        else:
-            a = m
-            m = (a + b) // 2
-    return a
+    return bisect.bisect_left(cumsum, n) - 1
 
 
 def mkmkpos(source):
@@ -87,8 +77,9 @@ def mkmkpos(source):
     '''
     lines = source.split('\n')
     cum_length = [0 for line in lines]
-    for i, line in enumerate([''] + lines[:-1]):
-        cum_length[i] = len(line) + 1 + ((cum_length[i - 1]) if i > 0 else 0)
+
+    for i, line in enumerate(lines[:-1], start=1):
+        cum_length[i] = len(line) + cum_length[i - 1]
 
     def mkpos(offset):
         i = find_line(offset, cum_length)

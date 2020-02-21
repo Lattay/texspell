@@ -49,7 +49,7 @@ class LanguageToolServer:
         with open(self.lock_path, 'w') as f:
             f.write(key)
 
-        time.sleep(0.5)
+        time.sleep(0.2)
 
         with open(self.lock_path, 'r') as f:
             res = f.read()
