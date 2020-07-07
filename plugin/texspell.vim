@@ -10,4 +10,4 @@ hi TexSpellError gui=none guifg=#3C3836 guibg=#FB4934 ctermfg=white ctermbg=red
 " Available mappings
 noremap <silent> <Plug>(texspell_jump_next) <Cmd>TexSpellJumpNext<CR>
 noremap <silent> <Plug>(texspell_jump_prev) <Cmd>TexSpellJumpPrev<CR>
-noremap <silent> <Plug>(texspell_check) <Cmd>TexSpellJumpPrev<CR>
+noremap <silent> <Plug>(texspell_check) <Cmd>TexSpellCheck<CR>
