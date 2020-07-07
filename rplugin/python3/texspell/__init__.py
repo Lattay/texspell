@@ -43,6 +43,17 @@ class TexSpell(object):
         '''
         list(self.backend.check(''))
 
+    @pynvim.command('TexSpellStatus')
+    @auto_start
+    def texspell_status(self):
+        '''
+        Echo some kind of status
+        '''
+        self.echo(
+            'Backend: {}'.format(self.backend),
+            self.backend.status()
+        )
+
     @pynvim.command('TexSpellCheck')
     @switchable
     def texspellcheck(self):

@@ -10,6 +10,8 @@ from .languagetool import LanguageToolServerInterface
 
 
 class Backend:
+    _backend_name = ''
+
     def __init__(self, name, nvim):
         self.name = name
         self.nvim = nvim
@@ -22,10 +24,21 @@ class Backend:
     def terminate(self):
         pass
 
+    def __repr__(self):
+        return self._backend_name if self._backend_name else 'generic'
+
+    def status(self):
+        return ''
+
 
 class NotABackend(Backend):
+    _backend_name = 'generic'
+
     def check(self, err):
         self.error('There is no backend registered with the name {}'.format(self.name))
+
+    def status(self):
+        return ''
 
 
 _backend_map = {}
@@ -35,6 +48,8 @@ def register_backend(name):
     def dec(cls):
         if name in _backend_map:
             warn('Existing {} backend have been overridden.')
+        if cls._backend_name == '':
+            cls._backend_name = name
         _backend_map[name] = cls
         return cls
     return dec
@@ -130,3 +145,10 @@ class LanguageTool(Backend):
     def terminate(self):
         if self.server is not None:
             self.server.terminate()
+
+    @auto_start
+    def status(self):
+        return 'Using server interface from {0}, listening on port {1}.'.format(
+            self.ltpath,
+            self.ltport
+        )
